@@ -1,0 +1,8 @@
+# Konfigurasi Apache Laragon untuk PHP Native
+DirectoryIndex index.php index.html
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Hindari eksekusi file tersembunyi
+    RewriteRule ^\.(.*)$ - [F,L]
+</IfModule>
