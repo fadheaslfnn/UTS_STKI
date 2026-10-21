@@ -45,25 +45,21 @@ require_once __DIR__ . '/includes/header.php';
   </div>
 <?php else: ?>
   <?php 
-    $combined = $foundDoc['title'] . ' ' . $foundDoc['content'];
+    $title = trim($foundDoc['title'] ?? '');
+    $content = trim($foundDoc['content'] ?? '');
+    $combined = ($title === $content || $content === '') ? $title : ($title . ' ' . $content);
     $docTokens = Preprocessor::preprocess($combined);
+    $uniqueTokens = array_values(array_unique($docTokens));
   ?>
   <article class="card-section" style="padding: 2.25rem;">
-    <div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap;">
+    <div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap;">
       <span class="token-pill" style="font-size: 0.85rem; padding: 0.25rem 0.65rem;">
-        ID Dokumen: <?= htmlspecialchars($foundDoc['id']) ?>
-      </span>
-      <span class="cat-badge" style="font-size: 0.85rem; padding: 0.25rem 0.65rem;">
-        <?= htmlspecialchars($foundDoc['category'] ?? 'Umum') ?>
+        Dokumen ID: <?= htmlspecialchars($foundDoc['id']) ?>
       </span>
     </div>
 
-    <h1 style="font-family: var(--font-heading); font-size: 1.85rem; font-weight: 700; margin-bottom: 1.25rem; line-height: 1.3;">
-      <?= htmlspecialchars($foundDoc['title']) ?>
-    </h1>
-
     <div style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-bottom: 0.5rem;">
-      Isi Teks Lengkap:
+      Isi Teks Dokumen:
     </div>
     <div class="doc-content-box">
       <?= nl2br(htmlspecialchars($foundDoc['content'])) ?>
@@ -72,18 +68,21 @@ require_once __DIR__ . '/includes/header.php';
     <!-- Token Ekstraksi -->
     <div style="padding-top: 1.25rem; border-top: 1px solid var(--border-color);">
       <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.75rem;">
-        Token Hasil Pra-proses Dokumen (<?= count($docTokens) ?> token unik/dasar):
+        Token Hasil Pra-proses Dokumen (<?= count($uniqueTokens) ?> token unik dari <?= count($docTokens) ?> total term):
       </div>
       <div class="doc-tokens-box">
-        <?php foreach ($docTokens as $tok): ?>
+        <?php foreach ($uniqueTokens as $tok): ?>
           <span class="token-pill"><?= htmlspecialchars($tok) ?></span>
         <?php endforeach; ?>
       </div>
     </div>
 
-    <div style="margin-top: 2rem; display: flex; gap: 1rem; align-items: center;">
-      <a href="fitur4_hasil.php?q=<?= urlencode($foundDoc['title']) ?>" class="btn-primary" style="font-size: 0.9rem;">
-        Cari Dokumen Terkait Judul Ini
+    <div style="margin-top: 2rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+      <a href="fitur2_preprocess.php?id=<?= urlencode($foundDoc['id']) ?>" class="btn-primary" style="font-size: 0.9rem;">
+        Lihat di Pipeline Pra-proses Teks &rarr;
+      </a>
+      <a href="fitur4_hasil.php?q=<?= urlencode(mb_substr($foundDoc['content'], 0, 50)) ?>" class="btn-secondary" style="font-size: 0.9rem;">
+        Cari Dokumen Serupa
       </a>
     </div>
   </article>

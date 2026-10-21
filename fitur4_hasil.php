@@ -147,39 +147,40 @@ require_once __DIR__ . '/includes/header.php';
     <?php foreach ($pageHits as $item): ?>
       <article class="result-card">
         <div class="card-top">
-          <div class="card-title-group">
+          <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
             <span class="rank-badge <?= ($item['rank'] === 1) ? 'rank-1' : (($item['rank'] === 2) ? 'rank-2' : (($item['rank'] === 3) ? 'rank-3' : '')) ?>">
               #<?= $item['rank'] ?>
             </span>
-            <h3 class="card-title">
-              <a href="document.php?id=<?= urlencode($item['doc_id']) ?>">
-                <?= htmlspecialchars($item['title']) ?>
-              </a>
-            </h3>
+            <span class="doc-id-badge" title="ID Dokumen">
+              ID: <?= htmlspecialchars($item['doc_id']) ?>
+            </span>
           </div>
 
           <div class="card-badges">
-            <span class="cat-badge"><?= htmlspecialchars($item['category']) ?></span>
             <span class="score-badge" title="Skor Cosine Similarity">
               <span>cos:</span> <?= number_format($item['score'], 4) ?>
-            </span>
-            <span class="doc-id-badge" title="ID Dokumen Asli">
-              ID: <?= htmlspecialchars($item['doc_id']) ?>
             </span>
           </div>
         </div>
 
-        <!-- Cuplikan Teks Berpenanda (Snippet with Highlighting) -->
-        <p class="card-snippet">
-          <?= $item['snippet'] ?>
-        </p>
+        <!-- Isi Dokumen (dengan Penanda Kata Kunci Kueri) -->
+        <div style="margin: 0.85rem 0 1rem;">
+          <div style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.35rem;">
+            Isi Dokumen:
+          </div>
+          <a href="fitur2_preprocess.php?id=<?= urlencode($item['doc_id']) ?>" class="table-doc-content" title="Klik untuk memproses teks di Pipeline Pra-proses">
+            <p class="card-snippet" style="margin: 0; font-size: 0.95rem; line-height: 1.65;">
+              <?= $item['snippet'] ?>
+            </p>
+          </a>
+        </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.05);">
-          <span style="color: var(--text-muted); font-size: 0.8rem;">
-            Bobot Relevansi Cosine: <strong style="color: #38bdf8;"><?= number_format($item['score'] * 100, 2) ?>%</strong>
+        <div class="card-footer-meta">
+          <span class="card-footer-score">
+            Bobot Relevansi Cosine: <strong class="score-percent-val"><?= number_format($item['score'] * 100, 2) ?>%</strong>
           </span>
-          <a href="document.php?id=<?= urlencode($item['doc_id']) ?>" style="font-weight: 600; font-size: 0.85rem;">
-            Lihat Isi Dokumen Lengkap &rarr;
+          <a href="fitur2_preprocess.php?id=<?= urlencode($item['doc_id']) ?>" class="card-doc-link">
+            Lihat Pra-proses Teks Lengkap &rarr;
           </a>
         </div>
         <div class="score-progress-wrap">

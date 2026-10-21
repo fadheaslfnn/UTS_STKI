@@ -9,85 +9,88 @@ $alert = null;
 $alertType = 'info';
 
 // Penanganan Aksi Manajemen Dataset (Upload CSV, Input Manual, Hapus, Reset)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+  $action = $_POST['action'] ?? '';
 
-    if ($action === 'upload_csv') {
-        if (isset($_FILES['csv_file']) && $_FILES['csv_file']['error'] === UPLOAD_ERR_OK) {
-            $tmpPath = $_FILES['csv_file']['tmp_name'];
-            $maxRows = max(1, (int)($_POST['max_rows'] ?? 1000));
-            $mode = $_POST['import_mode'] ?? 'replace';
-            $append = ($mode === 'append');
-            $count = DataManager::importUploadedCsv($tmpPath, $maxRows, $append);
-            if ($count > 0) {
-                TfidfEngine::buildIndex();
-                $alert = "Berhasil mengimpor {$count} dokumen dari file CSV yang Anda unggah!";
-                $alertType = 'success';
-            } else {
-                $alert = "Gagal membaca isi file CSV. Pastikan file berformat CSV dan memuat baris data yang valid.";
-                $alertType = 'error';
-            }
-        } else {
-            $errCode = $_FILES['csv_file']['error'] ?? 'tidak diketahui';
-            $alert = "Gagal mengunggah file (Kode error: {$errCode}). Silakan pilih file CSV yang valid.";
-            $alertType = 'error';
-        }
-    } elseif ($action === 'add_manual') {
-        $id = trim($_POST['doc_id'] ?? '');
-        $title = trim($_POST['title'] ?? '');
-        $content = trim($_POST['content'] ?? '');
-        $category = trim($_POST['category'] ?? '');
-
-        if ($title !== '') {
-            $docs = DataManager::getDocuments();
-            if ($id === '') {
-                $id = count($docs) + 1;
-            }
-            if ($content === '') {
-                $content = $title;
-            }
-            DataManager::addDocument($id, $title, $content, $category);
-            TfidfEngine::buildIndex();
-            $alert = "Dokumen baru dengan ID '{$id}' berhasil disimpan dan diindeks!";
-            $alertType = 'success';
-        } else {
-            $alert = "Judul dokumen wajib diisi.";
-            $alertType = 'error';
-        }
-    } elseif ($action === 'add_bulk') {
-        $rawText = trim($_POST['bulk_text'] ?? '');
-        if ($rawText !== '') {
-            $count = DataManager::addBulkFromText($rawText);
-            if ($count > 0) {
-                TfidfEngine::buildIndex();
-                $alert = "Berhasil menambahkan {$count} dokumen dari input teks massal!";
-                $alertType = 'success';
-            } else {
-                $alert = "Tidak ada baris dokumen yang valid ditemukan dalam teks input.";
-                $alertType = 'error';
-            }
-        } else {
-            $alert = "Teks dokumen massal tidak boleh kosong.";
-            $alertType = 'error';
-        }
-    } elseif ($action === 'delete_doc') {
-        $id = $_POST['id'] ?? '';
-        if ($id !== '') {
-            DataManager::deleteDocument($id);
-            TfidfEngine::buildIndex();
-            $alert = "Dokumen dengan ID '{$id}' berhasil dihapus.";
-            $alertType = 'success';
-        }
-    } elseif ($action === 'clear_all') {
-        DataManager::clearAll();
+  if ($action === 'upload_csv') {
+    if (isset($_FILES['csv_file']) && $_FILES['csv_file']['error'] === UPLOAD_ERR_OK) {
+      $tmpPath = $_FILES['csv_file']['tmp_name'];
+      $maxRows = max(1, (int) ($_POST['max_rows'] ?? 1000));
+      $mode = $_POST['import_mode'] ?? 'replace';
+      $append = ($mode === 'append');
+      $count = DataManager::importUploadedCsv($tmpPath, $maxRows, $append);
+      if ($count > 0) {
         TfidfEngine::buildIndex();
-        $alert = "Seluruh dataset telah dikosongkan. Silakan unggah CSV atau input dokumen baru.";
-        $alertType = 'info';
-    } elseif ($action === 'rebuild_index') {
-        TfidfEngine::buildIndex();
-        $alert = "Indeks korpus berhasil dibangun ulang!";
+        $alert = "Berhasil mengimpor {$count} dokumen dari file CSV yang Anda unggah!";
         $alertType = 'success';
+      } else {
+        $alert = "Gagal membaca isi file CSV. Pastikan file berformat CSV dan memuat baris data yang valid.";
+        $alertType = 'error';
+      }
+    } else {
+      $errCode = $_FILES['csv_file']['error'] ?? 'tidak diketahui';
+      $alert = "Gagal mengunggah file (Kode error: {$errCode}). Silakan pilih file CSV yang valid.";
+      $alertType = 'error';
     }
+  } elseif ($action === 'add_manual') {
+    $id = trim($_POST['doc_id'] ?? '');
+    $content = trim($_POST['content'] ?? '');
+
+    if ($content !== '') {
+      $docs = DataManager::getDocuments();
+      if ($id === '') {
+        $maxId = 0;
+        foreach ($docs as $d) {
+          if (is_numeric($d['id']) && (int) $d['id'] > $maxId) {
+            $maxId = (int) $d['id'];
+          }
+        }
+        $id = ($maxId > 0) ? ($maxId + 1) : (count($docs) + 1);
+      }
+      $title = $content;
+      $category = 'Umum';
+      DataManager::addDocument($id, $title, $content, $category);
+      TfidfEngine::buildIndex();
+      $alert = "Dokumen baru dengan ID '{$id}' berhasil disimpan dan diindeks!";
+      $alertType = 'success';
+    } else {
+      $alert = "Isi teks dokumen wajib diisi.";
+      $alertType = 'error';
+    }
+  } elseif ($action === 'add_bulk') {
+    $rawText = trim($_POST['bulk_text'] ?? '');
+    if ($rawText !== '') {
+      $count = DataManager::addBulkFromText($rawText);
+      if ($count > 0) {
+        TfidfEngine::buildIndex();
+        $alert = "Berhasil menambahkan {$count} dokumen dari input teks massal!";
+        $alertType = 'success';
+      } else {
+        $alert = "Tidak ada baris dokumen yang valid ditemukan dalam teks input.";
+        $alertType = 'error';
+      }
+    } else {
+      $alert = "Teks dokumen massal tidak boleh kosong.";
+      $alertType = 'error';
+    }
+  } elseif ($action === 'delete_doc') {
+    $id = $_POST['id'] ?? '';
+    if ($id !== '') {
+      DataManager::deleteDocument($id);
+      TfidfEngine::buildIndex();
+      $alert = "Dokumen dengan ID '{$id}' berhasil dihapus.";
+      $alertType = 'success';
+    }
+  } elseif ($action === 'clear_all') {
+    DataManager::clearAll();
+    TfidfEngine::buildIndex();
+    $alert = "Seluruh dataset telah dikosongkan. Silakan unggah CSV atau input dokumen baru.";
+    $alertType = 'info';
+  } elseif ($action === 'rebuild_index') {
+    TfidfEngine::buildIndex();
+    $alert = "Indeks korpus berhasil dibangun ulang!";
+    $alertType = 'success';
+  }
 }
 
 // Ambil data indeks korpus terkini
@@ -108,7 +111,8 @@ require_once __DIR__ . '/includes/header.php';
   </div>
   <h1 class="hero-title">Mesin Pencari Dokumen Teks</h1>
   <p class="hero-desc">
-    Sistem temu kembali informasi dengan pembobotan <strong>TF-IDF</strong> baku dan perangkingan <strong>Cosine Similarity</strong>.
+    Sistem temu kembali informasi dengan pembobotan <strong>TF-IDF</strong> baku dan perangkingan <strong>Cosine
+      Similarity</strong>.
   </p>
 </div>
 
@@ -123,19 +127,14 @@ require_once __DIR__ . '/includes/header.php';
 <div class="search-form-wrapper">
   <form action="fitur4_hasil.php" method="GET">
     <div class="search-box">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.5rem; opacity: 0.6; flex-shrink: 0;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.5rem; opacity: 0.6; flex-shrink: 0;">
         <circle cx="11" cy="11" r="8"></circle>
         <path d="m21 21-4.35-4.35"></path>
       </svg>
-      <input 
-        type="text" 
-        name="q" 
-        class="search-input" 
-        placeholder="Ketik kata kunci pencarian, contoh: 'jaringan komputer'..." 
-        autocomplete="off" 
-        autofocus
-        maxlength="200"
-      >
+      <input type="text" name="q" class="search-input"
+        placeholder="Ketik kata kunci pencarian, contoh: 'jaringan komputer'..." autocomplete="off" autofocus
+        maxlength="200">
       <div class="search-actions">
         <div class="topk-wrap" title="Pilihan Top-K hasil pencarian">
           <span>K:</span>
@@ -178,7 +177,8 @@ require_once __DIR__ . '/includes/header.php';
     <div class="stat-card-header">
       <span class="stat-title">Dokumen Terindeks</span>
       <div class="stat-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
           <polyline points="14 2 14 8 20 8"></polyline>
         </svg>
@@ -192,7 +192,8 @@ require_once __DIR__ . '/includes/header.php';
     <div class="stat-card-header">
       <span class="stat-title">Ukuran Vocabulary</span>
       <div class="stat-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
           <polyline points="4 7 4 4 20 4 20 7"></polyline>
           <line x1="9" y1="20" x2="15" y2="20"></line>
           <line x1="12" y1="4" x2="12" y2="20"></line>
@@ -207,7 +208,8 @@ require_once __DIR__ . '/includes/header.php';
     <div class="stat-card-header">
       <span class="stat-title">Metode Perangkingan</span>
       <div class="stat-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 3v18"></path>
           <rect width="18" height="18" x="3" y="3" rx="2"></rect>
           <path d="M3 9h18"></path>
@@ -217,22 +219,6 @@ require_once __DIR__ . '/includes/header.php';
     </div>
     <div class="stat-value" style="font-size: 1.5rem; color: #34d399;">VSM & TF-IDF</div>
     <div class="stat-note">W = TF &times; log10(N/DF)</div>
-  </div>
-
-  <div class="stat-card" style="--stat-accent: #f59e0b;">
-    <div class="stat-card-header">
-      <span class="stat-title">Waktu Pembaruan Indeks</span>
-      <div class="stat-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <polyline points="12 6 12 12 16 14"></polyline>
-        </svg>
-      </div>
-    </div>
-    <div class="stat-value" style="font-size: 1.15rem; font-family: var(--font-mono);">
-      <?= htmlspecialchars($builtAt) ?>
-    </div>
-    <div class="stat-note">Cache indeks otomatis diperbarui</div>
   </div>
 </div>
 
@@ -250,7 +236,8 @@ require_once __DIR__ . '/includes/header.php';
         </button>
       </form>
       <?php if ($nDocs > 0): ?>
-        <form method="POST" style="display: inline;" onsubmit="return confirm('Apakah Anda yakin ingin mengosongkan seluruh dataset?');">
+        <form method="POST" style="display: inline;"
+          onsubmit="return confirm('Apakah Anda yakin ingin mengosongkan seluruh dataset?');">
           <input type="hidden" name="action" value="clear_all">
           <button type="submit" class="btn-danger btn-sm" title="Kosongkan seluruh data">
             Kosongkan Semua
@@ -265,11 +252,8 @@ require_once __DIR__ . '/includes/header.php';
     <button type="button" class="tab-btn active" data-tab="tab-manual">
       <span>1. Input Dokumen Manual (Satuan)</span>
     </button>
-    <button type="button" class="tab-btn" data-tab="tab-bulk">
-      <span>2. Tempel Teks Massal (Bulk)</span>
-    </button>
     <button type="button" class="tab-btn" data-tab="tab-csv">
-      <span>3. Unggah File CSV Milik Anda</span>
+      <span>2. Unggah File CSV Milik Anda</span>
     </button>
   </div>
 
@@ -278,46 +262,23 @@ require_once __DIR__ . '/includes/header.php';
     <div class="tab-content-card">
       <div style="margin-bottom: 1.25rem;">
         <h3 style="font-family: var(--font-heading); font-size: 1.15rem; color: #38bdf8; margin-bottom: 0.35rem;">
-          Input Dokumen Satu per Satu
+          Input Dokumen Teks
         </h3>
         <p style="font-size: 0.85rem; color: var(--text-secondary);">
-          Masukkan data dokumen secara langsung melalui formulir di bawah ini. Dokumen akan langsung disimpan dan diindeks ke sistem.
+          Masukkan isi teks dokumen melalui formulir di bawah ini. Dokumen akan langsung disimpan dan diindeks ke
+          sistem.
         </p>
       </div>
 
       <form method="POST">
         <input type="hidden" name="action" value="add_manual">
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label">
-              <span>ID Dokumen</span>
-              <span style="font-size: 0.75rem; color: var(--text-muted);">(Opsional, otomatis jika kosong)</span>
-            </label>
-            <input type="text" name="doc_id" class="form-input" placeholder="contoh: DOC-1">
-          </div>
-          <div class="form-group">
-            <label class="form-label">
-              <span>Kategori</span>
-              <span style="font-size: 0.75rem; color: var(--text-muted);">(Opsional)</span>
-            </label>
-            <input type="text" name="category" class="form-input" placeholder="contoh: Teknologi, Sains, Kesehatan">
-          </div>
-        </div>
-
         <div class="form-group">
           <label class="form-label">
-            <span>Judul Dokumen</span>
+            <span>Isi Dokumen</span>
             <span style="color: #f87171;">* (Wajib)</span>
           </label>
-          <input type="text" name="title" class="form-input" placeholder="Ketik judul dokumen..." required>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">
-            <span>Isi Teks Dokumen</span>
-            <span style="font-size: 0.75rem; color: var(--text-muted);">(Opsional, otomatis menggunakan judul jika kosong)</span>
-          </label>
-          <textarea name="content" class="form-textarea" rows="4" placeholder="Ketik isi lengkap teks dokumen..."></textarea>
+          <textarea name="content" class="form-textarea" rows="5"
+            placeholder="Ketik atau tempel isi teks dokumen di sini..." required></textarea>
         </div>
 
         <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
@@ -329,46 +290,7 @@ require_once __DIR__ . '/includes/header.php';
     </div>
   </div>
 
-  <!-- Tab 2: Input Massal Langsung (Bulk Paste) -->
-  <div class="tab-pane" id="tab-bulk">
-    <div class="tab-content-card">
-      <div style="margin-bottom: 1.25rem;">
-        <h3 style="font-family: var(--font-heading); font-size: 1.15rem; color: #34d399; margin-bottom: 0.35rem;">
-          Tempel Banyak Dokumen Sekaligus (Bulk Input)
-        </h3>
-        <p style="font-size: 0.85rem; color: var(--text-secondary);">
-          Tempelkan kumpulan dokumen langsung ke kotak teks di bawah. Format yang didukung per baris:<br>
-          <code class="token-pill">Judul | Isi Dokumen | Kategori</code> atau cukup <code class="token-pill">Judul</code> saja pada tiap barisnya.
-        </p>
-      </div>
-
-      <form method="POST">
-        <input type="hidden" name="action" value="add_bulk">
-        <div class="form-group">
-          <label class="form-label">
-            <span>Tempel Teks (1 Baris = 1 Dokumen)</span>
-            <span style="color: #f87171;">*</span>
-          </label>
-          <textarea 
-            name="bulk_text" 
-            class="form-textarea" 
-            rows="8" 
-            style="font-family: var(--font-mono); font-size: 0.85rem;" 
-            placeholder="Contoh format:&#10;Kecerdasan Buatan dan Robotika | Pembahasan AI modern dan aplikasinya | Teknologi&#10;Sistem Temu Kembali Informasi | Information retrieval dengan VSM dan TF-IDF | STKI&#10;Manajemen Rekam Medis Pasien | Sistem pencatatan riwayat medis rumah sakit | Kesehatan"
-            required
-          ></textarea>
-        </div>
-
-        <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
-          <button type="submit" class="btn-primary" style="background: linear-gradient(135deg, #059669, #047857);">
-            <span>Proses & Indeks Semua Baris</span>
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Tab 3: Unggah File CSV Milik Anda -->
+  <!-- Tab 2: Unggah File CSV Milik Anda -->
   <div class="tab-pane" id="tab-csv">
     <div class="tab-content-card">
       <div style="margin-bottom: 1.25rem;">
@@ -376,7 +298,7 @@ require_once __DIR__ . '/includes/header.php';
           Unggah File CSV Milik Anda
         </h3>
         <p style="font-size: 0.85rem; color: var(--text-secondary);">
-          Pilih file CSV dari komputer Anda. Kolom otomatis dikenali (misal: <em>title/judul</em>, <em>content/isi</em>, <em>category/kategori</em>).
+          Pilih file CSV dari komputer Anda. Kolom teks otomatis dikenali (misal: <em>isi / content / teks</em>).
         </p>
       </div>
 
@@ -401,7 +323,7 @@ require_once __DIR__ . '/includes/header.php';
           <div class="form-group">
             <label class="form-label">Batas Maksimal Baris:</label>
             <select name="max_rows" class="form-select">
-              <option value="1000" selected>1.000 Dokumen (Standar Target Tugas UTS STKI)</option>
+              <option value="1000" selected>1.000 Dokumen</option>
               <option value="500">500 Dokumen</option>
               <option value="2000">2.000 Dokumen</option>
               <option value="5000">5.000 Dokumen</option>
@@ -426,13 +348,8 @@ require_once __DIR__ . '/includes/header.php';
     </div>
     <?php if ($nDocs > 0): ?>
       <div style="max-width: 280px; width: 100%;">
-        <input 
-          type="text" 
-          id="tableFilterInput" 
-          class="form-input" 
-          placeholder="Filter tabel..." 
-          style="padding: 0.4rem 0.75rem; font-size: 0.82rem;"
-        >
+        <input type="text" id="tableFilterInput" class="form-input" placeholder="Filter tabel..."
+          style="padding: 0.4rem 0.75rem; font-size: 0.82rem;">
       </div>
     <?php endif; ?>
   </div>
@@ -440,15 +357,19 @@ require_once __DIR__ . '/includes/header.php';
   <?php if (empty($docs)): ?>
     <div class="empty-state-card">
       <div class="empty-state-icon">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"></path>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path
+            d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z">
+          </path>
         </svg>
       </div>
       <h3 style="font-family: var(--font-heading); font-size: 1.25rem; margin-bottom: 0.5rem; color: var(--text-bright);">
         Belum Ada Dokumen di Sistem
       </h3>
       <p style="font-size: 0.9rem; color: var(--text-secondary); max-width: 450px; margin: 0 auto 1.5rem;">
-        Sistem saat ini bersih dan siap menerima data. Silakan pilih tab di atas untuk menginput dokumen manual, menempel teks massal, atau mengunggah file CSV milik Anda.
+        Sistem saat ini bersih dan siap menerima data. Silakan pilih tab di atas untuk menginput dokumen manual atau
+        mengunggah file CSV milik Anda.
       </p>
     </div>
   <?php else: ?>
@@ -456,34 +377,34 @@ require_once __DIR__ . '/includes/header.php';
       <table class="data-table">
         <thead>
           <tr>
-            <th style="width: 70px;">ID</th>
-            <th style="width: 140px;">Kategori</th>
-            <th>Judul Dokumen</th>
-            <th>Cuplikan Isi Teks</th>
-            <th style="width: 130px; text-align: center;">Aksi</th>
+            <th style="width: 75px;">ID</th>
+            <th>Isi</th>
+            <th style="width: 140px; text-align: center;">Aksi</th>
           </tr>
         </thead>
         <tbody>
           <?php foreach (array_slice($docs, 0, 50) as $d): ?>
+            <?php
+            $docContent = !empty($d['content']) ? $d['content'] : ($d['title'] ?? '');
+            ?>
             <tr>
               <td><span class="token-pill" style="font-size: 0.75rem;"><?= htmlspecialchars($d['id']) ?></span></td>
-              <td><span class="cat-badge"><?= htmlspecialchars($d['category'] ?? 'Umum') ?></span></td>
-              <td>
-                <a href="document.php?id=<?= urlencode($d['id']) ?>" style="font-weight: 600;">
-                  <?= htmlspecialchars($d['title']) ?>
+              <td style="font-size: 0.88rem; line-height: 1.5;">
+                <a href="fitur2_preprocess.php?id=<?= urlencode($d['id']) ?>" class="table-doc-content"
+                  title="Buka di Pipeline Pra-proses Teks">
+                  <?= htmlspecialchars(mb_strlen($docContent) > 220 ? mb_substr($docContent, 0, 220) . '...' : $docContent) ?>
                 </a>
               </td>
-              <td style="color: var(--text-secondary); font-size: 0.85rem;">
-                <?= htmlspecialchars(mb_substr($d['content'], 0, 100)) ?>...
-              </td>
-              <td style="text-align: center;">
-                <a href="document.php?id=<?= urlencode($d['id']) ?>" class="btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+              <td style="text-align: center; white-space: nowrap;">
+                <a href="fitur2_preprocess.php?id=<?= urlencode($d['id']) ?>" class="btn-secondary btn-sm"
+                  style="padding: 0.25rem 0.6rem; font-size: 0.75rem;" title="Lihat Pipeline Preprocessing">
                   Lihat
                 </a>
-                <form method="POST" style="display: inline;" onsubmit="return confirm('Hapus dokumen ID <?= htmlspecialchars($d['id']) ?>?');">
+                <form method="POST" style="display: inline;"
+                  onsubmit="return confirm('Hapus dokumen ID <?= htmlspecialchars($d['id']) ?>?');">
                   <input type="hidden" name="action" value="delete_doc">
                   <input type="hidden" name="id" value="<?= htmlspecialchars($d['id']) ?>">
-                  <button type="submit" class="btn-danger btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                  <button type="submit" class="btn-danger btn-sm" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;">
                     Hapus
                   </button>
                 </form>

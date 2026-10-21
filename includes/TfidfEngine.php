@@ -62,7 +62,9 @@ class TfidfEngine
         $uniqueTerms = [];
 
         foreach ($docs as $i => $doc) {
-            $combined = ($doc['title'] ?? '') . ' ' . ($doc['content'] ?? '');
+            $title = trim($doc['title'] ?? '');
+            $content = trim($doc['content'] ?? '');
+            $combined = ($title === $content || $content === '') ? $title : ($title . ' ' . $content);
             $tokens = Preprocessor::preprocess($combined);
             $docsTokens[$i] = $tokens;
 

@@ -218,11 +218,193 @@ class Preprocessor
     }
 
     /**
+     * Menghasilkan kandidat kata jika akhiran derivasi (-kan, -an, -i) dipotong
+     */
+    private static function stripSuffix(string $w): array
+    {
+        $cands = [];
+        $len = strlen($w);
+        if ($len <= 3) {
+            return [];
+        }
+
+        // -kan (bisa dari -kan atau kata berakhiran 'k' + an)
+        if (str_ends_with($w, 'kan')) {
+            $cands[] = substr($w, 0, -3); // e.g. kirimkan -> kirim
+            $cands[] = substr($w, 0, -2); // e.g. masukan -> masuk
+        }
+        // -an
+        if (str_ends_with($w, 'an')) {
+            $cands[] = substr($w, 0, -2); // e.g. makanan -> makan, pengambilan -> pengambil
+        }
+        // -i
+        if (str_ends_with($w, 'i')) {
+            $cands[] = substr($w, 0, -1); // e.g. memahami -> memaham, mengawasi -> mengawas
+        }
+
+        $valid = [];
+        foreach ($cands as $c) {
+            $c = trim($c);
+            if (strlen($c) >= 2 && !isset($valid[$c])) {
+                $valid[$c] = true;
+            }
+        }
+        return array_keys($valid);
+    }
+
+    /**
+     * Menghasilkan kandidat kata dasar berdasarkan aturan awalan (Prefix Disambiguation Rules) Nazief-Adriani
+     */
+    private static function stripPrefix(string $w): array
+    {
+        $cands = [];
+        $len = strlen($w);
+        if ($len < 4) {
+            return [];
+        }
+
+        // 1. memper-
+        if (str_starts_with($w, 'memper')) {
+            $cands[] = substr($w, 6); // memperjelas -> jelas
+            $cands[] = substr($w, 3); // memperjelas -> perjelas
+        }
+
+        // 2. meng- / peng-
+        if (preg_match('/^(meng|peng)(.+)$/', $w, $m)) {
+            $rest = $m[2];
+            $firstChar = $rest[0];
+            if (in_array($firstChar, ['a', 'i', 'u', 'e', 'o'])) {
+                if ($rest === 'ira') {
+                    $cands[] = 'kira';
+                    $cands[] = 'ira';
+                } else {
+                    $cands[] = $rest;            // mengalir -> alir, pengawas -> awas, mengambil -> ambil
+                    $cands[] = 'k' . $rest;      // mengupas -> kupas, mengarang -> karang, mengunci -> kunci
+                }
+            }
+            if (in_array($firstChar, ['g', 'h', 'k', 'q'])) {
+                $cands[] = $rest;            // menggali -> gali, penghubung -> hubung
+            }
+            if (in_array($firstChar, ['l', 'r'])) {
+                $cands[] = $rest;            // penglihatan -> lihat, pengrusak -> rusak
+            }
+        }
+
+        // 3. menge- / penge- (1 suku kata)
+        if (preg_match('/^(menge|penge)(.+)$/', $w, $m)) {
+            $cands[] = $m[2]; // mengecat -> cat, mengebom -> bom
+        }
+
+        // 4. meny- / peny- (Peluluhan s)
+        if (preg_match('/^(meny|peny)(.+)$/', $w, $m)) {
+            $rest = $m[2];
+            $cands[] = 's' . $rest;          // menyapu -> sapu, penyusunan -> susun
+            $cands[] = $rest;
+            $cands[] = 'ny' . $rest;         // menyanyi -> nyanyi
+        }
+
+        // 5. mem- / pem- (Konsonan b, f, v, p dan peluluhan p)
+        if (preg_match('/^(mem|pem)(.+)$/', $w, $m)) {
+            $rest = $m[2];
+            $firstChar = $rest[0];
+            if (in_array($firstChar, ['a', 'i', 'u', 'e', 'o'])) {
+                $cands[] = 'p' . $rest;      // memahami -> paham, memilih -> pilih, memakai -> pakai
+                $cands[] = $rest;
+            }
+            if (in_array($firstChar, ['b', 'f', 'p', 'v'])) {
+                $cands[] = $rest;            // membaca -> baca, pembeli -> beli, mempunyai -> punya
+            }
+        }
+
+        // 6. men- / pen- (Konsonan c, d, j, s, z dan peluluhan t)
+        if (preg_match('/^(men|pen)(.+)$/', $w, $m)) {
+            $rest = $m[2];
+            $firstChar = $rest[0];
+            if (in_array($firstChar, ['a', 'i', 'u', 'e', 'o'])) {
+                $cands[] = 't' . $rest;      // menulis -> tulis, penolong -> tolong
+                $cands[] = $rest;
+            }
+            if (in_array($firstChar, ['c', 'd', 'j', 's', 'z'])) {
+                $cands[] = $rest;            // mencari -> cari, pendidik -> didik
+            }
+        }
+
+        // 7. per- / pel-
+        if (str_starts_with($w, 'per')) {
+            $cands[] = substr($w, 3);        // perjanjian -> janji, perkembang -> kembang
+        }
+        if (str_starts_with($w, 'pel')) {
+            $cands[] = substr($w, 3);        // pelopor -> opor
+        }
+
+        // 8. ber- / be-
+        if (str_starts_with($w, 'ber')) {
+            $rest = substr($w, 3);
+            $cands[] = $rest;                // berjalan -> jalan
+            if (isset($rest[0]) && in_array($rest[0], ['a', 'i', 'u', 'e', 'o'])) {
+                $cands[] = 'r' . $rest;      // beragam -> ragam
+            }
+        }
+        if (preg_match('/^be([bcdfghjklmnpqrstvwxyz])er(.+)$/', $w, $m)) {
+            $cands[] = $m[1] . 'er' . $m[2]; // bekerja -> kerja
+        }
+        if (str_starts_with($w, 'be')) {
+            $cands[] = substr($w, 2);
+        }
+
+        // 9. ter- / te-
+        if (str_starts_with($w, 'ter')) {
+            $rest = substr($w, 3);
+            $cands[] = $rest;                // terbaca -> baca
+            if (isset($rest[0]) && in_array($rest[0], ['a', 'i', 'u', 'e', 'o'])) {
+                $cands[] = 'r' . $rest;      // terasa -> rasa
+            }
+        }
+        if (preg_match('/^te([bcdfghjklmnpqrstvwxyz])er(.+)$/', $w, $m)) {
+            $cands[] = $m[1] . 'er' . $m[2]; // tepercaya -> percaya
+        }
+        if (str_starts_with($w, 'te')) {
+            $cands[] = substr($w, 2);
+        }
+
+        // 10. me- / pe- (Untuk konsonan l, m, n, r, w, y)
+        if (preg_match('/^(me|pe)([lmnrwy])(.+)$/', $w, $m)) {
+            $cands[] = $m[2] . $m[3];        // melihat -> lihat, merawat -> rawat, memasak -> masak
+        }
+        if (str_starts_with($w, 'me')) {
+            $cands[] = substr($w, 2);
+        }
+        if (str_starts_with($w, 'pe')) {
+            $cands[] = substr($w, 2);
+        }
+
+        // 11. di-, ke-, se-
+        if (str_starts_with($w, 'di')) {
+            $cands[] = substr($w, 2);        // dikirim -> kirim, dibuat -> buat
+        }
+        if (str_starts_with($w, 'ke')) {
+            $cands[] = substr($w, 2);        // ketua -> tua, kekasih -> kasih
+        }
+        if (str_starts_with($w, 'se')) {
+            $cands[] = substr($w, 2);        // serupa -> rupa, sebuah -> buah
+        }
+
+        $valid = [];
+        foreach ($cands as $c) {
+            $c = trim($c);
+            if (strlen($c) >= 2 && !isset($valid[$c])) {
+                $valid[$c] = true;
+            }
+        }
+        return array_keys($valid);
+    }
+
+    /**
      * Tahap 5: Stemming Kata Bahasa Indonesia (Nazief & Adriani Rule-Based Stemmer)
      */
     public static function stemWord(string $word): string
     {
-        $word = trim($word);
+        $word = trim(mb_strtolower($word, 'UTF-8'));
         if (strlen($word) < 4) {
             return $word;
         }
@@ -232,67 +414,117 @@ class Preprocessor
         }
 
         $roots = self::getRootWords();
+
+        // 0. Cek langsung kata dasar di kamus
         if (isset($roots[$word])) {
             return self::$stemCache[$word] = $word;
         }
 
         $original = $word;
 
-        // 1. Hapus Partikel Infleksional (-lah, -kah, -pun, -tah)
-        $word = preg_replace('/(lah|kah|pun|tah)$/', '', $word);
-        if (isset($roots[$word])) {
-            return self::$stemCache[$original] = $word;
-        }
-
-        // 2. Hapus Pronoun Kepunyaan (-ku, -mu, -nya)
-        $word = preg_replace('/(ku|mu|nya)$/', '', $word);
-        if (isset($roots[$word])) {
-            return self::$stemCache[$original] = $word;
-        }
-
-        // 3. Hapus Akhiran Derivasi (-kan, -an, -i)
-        if (preg_replace('/(kan|an|i)$/', '', $word, 1, $count) && $count > 0) {
-            $candidate = preg_replace('/(kan|an|i)$/', '', $word);
-            if (isset($roots[$candidate])) {
-                return self::$stemCache[$original] = $candidate;
+        // 1. Partikel Infleksional (-lah, -kah, -pun, -tah)
+        $wNoParticle = preg_replace('/(lah|kah|pun|tah)$/', '', $word);
+        if ($wNoParticle !== $word) {
+            if (isset($roots[$wNoParticle])) {
+                return self::$stemCache[$original] = $wNoParticle;
             }
-            $word = $candidate;
+            $word = $wNoParticle;
         }
 
-        // 4. Hapus Awalan Derivasi (meng-, meny-, mem-, me-, peng-, peny-, pem-, pe-, di-, ter-, te-, ke-, ber-, be-, per-, se-)
-        $prefixes = [
-            '/^meng([aiueo])/' => '$1',
-            '/^meng([ghk])/'   => '$1',
-            '/^meny([s])/'     => '$1',
-            '/^men([cdjsz])/'  => '$1',
-            '/^mem([bfpv])/'   => '$1',
-            '/^me/'            => '',
-            '/^peng([aiueo])/' => '$1',
-            '/^peng([ghk])/'   => '$1',
-            '/^peny([s])/'     => '$1',
-            '/^pen([cdjsz])/'  => '$1',
-            '/^pem([bfpv])/'   => '$1',
-            '/^per/'           => '',
-            '/^pe/'            => '',
-            '/^ber([aiueo])/'  => '$1',
-            '/^ber/'           => '',
-            '/^belajar/'       => 'ajar',
-            '/^be/'            => '',
-            '/^ter/'           => '',
-            '/^te/'            => '',
-            '/^di/'            => '',
-            '/^ke/'            => '',
-            '/^se/'            => '',
-        ];
+        // 2. Pronoun Kepunyaan (-ku, -mu, -nya)
+        $wNoPronoun = preg_replace('/(ku|mu|nya)$/', '', $word);
+        if ($wNoPronoun !== $word) {
+            if (isset($roots[$wNoPronoun])) {
+                return self::$stemCache[$original] = $wNoPronoun;
+            }
+            $word = $wNoPronoun;
+        }
 
-        foreach ($prefixes as $pattern => $replacement) {
-            if (preg_match($pattern, $word)) {
-                $candidate = preg_replace($pattern, $replacement, $word);
-                if (isset($roots[$candidate]) || strlen($candidate) >= 3) {
-                    $word = $candidate;
-                    break;
+        // 3. Kasus khusus: belajar, pelajar, pembelajaran
+        if (preg_match('/^(belajar|pelajar|pembelajaran)/', $word)) {
+            if (isset($roots['ajar'])) {
+                return self::$stemCache[$original] = 'ajar';
+            }
+        }
+
+        $sufCands = self::stripSuffix($word);
+        $prefCands = self::stripPrefix($word);
+
+        // 4. Jika pola nominal konfiks (peN-...-an, ke-...-an, per-...-an), dahulukan konfiks
+        // Contoh: "pembelian" -> "beli", "pengambilan" -> "ambil", "keterbukaan" -> "buka"
+        $isNominalConfix = (bool)preg_match('/^(pe|pem|pen|peng|peny|per|ke).+an$/', $word);
+        if ($isNominalConfix) {
+            foreach ($sufCands as $sCand) {
+                $pCands = self::stripPrefix($sCand);
+                foreach ($pCands as $cand) {
+                    if (isset($roots[$cand])) {
+                        return self::$stemCache[$original] = $cand;
+                    }
                 }
             }
+        }
+
+        // 5. Cek prefiks saja (e.g. "memakai" -> "pakai", "berjalan" -> "jalan", "membaca" -> "baca")
+        foreach ($prefCands as $cand) {
+            if (isset($roots[$cand])) {
+                return self::$stemCache[$original] = $cand;
+            }
+        }
+
+        // 6. Coba konfiks umum (e.g. "memahami" -> cut '-i' = "memaham" -> "paham", "mengurangi" -> "kurang")
+        foreach ($sufCands as $sCand) {
+            $pCands = self::stripPrefix($sCand);
+            foreach ($pCands as $cand) {
+                if (isset($roots[$cand])) {
+                    return self::$stemCache[$original] = $cand;
+                }
+            }
+        }
+
+        // 7. Konfiks sebaliknya: Prefiks LALU Sufiks
+        foreach ($prefCands as $pCand) {
+            $sCands = self::stripSuffix($pCand);
+            foreach ($sCands as $cand) {
+                if (isset($roots[$cand])) {
+                    return self::$stemCache[$original] = $cand;
+                }
+            }
+        }
+
+        // 8. Multi-Prefix + Sufiks (e.g. "memperbaiki" -> baik, "pembelajaran" -> ajar)
+        foreach ($prefCands as $pCand) {
+            $subP = self::stripPrefix($pCand);
+            foreach ($subP as $subCand) {
+                if (isset($roots[$subCand])) {
+                    return self::$stemCache[$original] = $subCand;
+                }
+                $subS = self::stripSuffix($subCand);
+                foreach ($subS as $sc) {
+                    if (isset($roots[$sc])) {
+                        return self::$stemCache[$original] = $sc;
+                    }
+                }
+            }
+        }
+
+        // 9. Cek sufiks saja (e.g. "makanan" -> "makan", "lukisan" -> "lukis")
+        foreach ($sufCands as $cand) {
+            if (isset($roots[$cand])) {
+                return self::$stemCache[$original] = $cand;
+            }
+        }
+
+        // 10. Fallback jika kata tidak ada di kamus kata dasar (istilah serapan/asing/baru)
+        if (!empty($sufCands)) {
+            foreach ($sufCands as $sc) {
+                $pc = self::stripPrefix($sc);
+                if (!empty($pc) && strlen($pc[0]) >= 3) {
+                    return self::$stemCache[$original] = $pc[0];
+                }
+            }
+        }
+        if (!empty($prefCands) && strlen($prefCands[0]) >= 3) {
+            return self::$stemCache[$original] = $prefCands[0];
         }
 
         return self::$stemCache[$original] = $word;
@@ -338,7 +570,20 @@ class Preprocessor
         $cleaned = self::cleaning($folded);
         $tokens = self::tokenize($cleaned);
         $noStop = self::removeStopwords($tokens);
-        $stemmed = self::stem($noStop);
+        $stemmed = [];
+        $stemPairs = [];
+
+        foreach ($noStop as $w) {
+            $s = self::stemWord($w);
+            if (strlen($s) >= 2) {
+                $stemmed[] = $s;
+            }
+            $stemPairs[] = [
+                'from' => $w,
+                'to' => $s,
+                'changed' => ($w !== $s)
+            ];
+        }
 
         return [
             'original' => $original,
@@ -347,6 +592,7 @@ class Preprocessor
             'tokens' => $tokens,
             'stopword_removed' => $noStop,
             'stemmed' => $stemmed,
+            'stem_pairs' => $stemPairs,
         ];
     }
 }

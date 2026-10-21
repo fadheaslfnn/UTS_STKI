@@ -6,6 +6,8 @@ require_once __DIR__ . '/../includes/DataManager.php';
 require_once __DIR__ . '/../includes/TfidfEngine.php';
 require_once __DIR__ . '/../includes/VsmEngine.php';
 
+$backupDocs = DataManager::getDocuments();
+
 echo "=== 1. TEST CLEAR ALL ===\n";
 DataManager::clearAll();
 assert(count(DataManager::getDocuments()) === 0, "Docs must be 0 after clear");
@@ -54,9 +56,9 @@ $res2 = VsmEngine::search('kriptografi rsa', $index2, 5);
 assert(count($res2['hits']) >= 1, "Should find RSA doc");
 echo "PASS: Pencarian dari CSV 'kriptografi rsa': " . $res2['hits'][0]['title'] . " (Score: " . $res2['hits'][0]['score'] . ")\n";
 
-echo "=== CLEANUP: KOSONGKAN KEMBALI DATASET SETELAH TEST ===\n";
-DataManager::clearAll();
-assert(count(DataManager::getDocuments()) === 0, "Docs must be 0 after test cleanup");
-echo "PASS: Dataset kembali kosong murni.\n";
+echo "=== CLEANUP: KEMBALIKAN DATASET ASLI SETELAH TEST ===\n";
+DataManager::saveDocuments($backupDocs);
+TfidfEngine::buildIndex();
+echo "PASS: Dataset asli (" . count($backupDocs) . " dokumen) berhasil dipulihkan secara aman.\n";
 
 echo "=== ALL INPUT AND SEARCH TESTS PASSED SUCCESSFULLY! ===\n";
