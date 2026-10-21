@@ -1,4 +1,4 @@
-# Mesin Pencari Mandiri VSM & TF-IDF (PHP Native - Laragon)
+# Mesin Pencari Mandiri VSM & TF-IDF 
 
 Aplikasi web mesin pencari mandiri untuk **Ujian Tengah Semester (UTS) Sistem Temu Kembali Informasi (STKI)**. 
 
