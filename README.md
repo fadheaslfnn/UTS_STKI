@@ -1,6 +1,6 @@
 # Mesin Pencari Mandiri VSM & TF-IDF (PHP Native - Laragon)
 
-Aplikasi web mesin pencari mandiri untuk **Ujian Tengah Semester (UTS) Sistem Temu Kembali Informasi (STKI)**. Dibangun menggunakan **PHP Native** sehingga berjalan langsung pada server Apache Laragon tanpa memerlukan Python atau kompilasi tambahan.
+Aplikasi web mesin pencari mandiri untuk **Ujian Tengah Semester (UTS) Sistem Temu Kembali Informasi (STKI)**. 
 
 ---
 
